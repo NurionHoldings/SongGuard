@@ -190,7 +190,16 @@ class Handler(BaseHTTPRequestHandler):
             text=draft(kind,case,linked['claim'],linked['asset'])
             return self.send(200,text.encode(),'text/plain; charset=utf-8',{'Content-Disposition':'attachment; filename="Song_Guard_draft.txt"'})
         if path in ('/api/calculate','/api/scenario','/api/preemption') and method=='POST':
-            p=json.loads(self.body()); return self.send(200,{'result':{'/api/calculate':ledger,'/api/scen…340 tokens truncated….fetchone()
+            p=json.loads(self.body()); return self.send(200,{'result':{'/api/calculate':ledger,'/api/scenario':scenario,'/api/preemption':preemption}[path](p)})
+        if path=='/api/record' and method=='POST':
+            p=json.loads(self.body()); kind=p['kind']; data=p['payload']; validate(kind,data); rid=p.get('id') or secrets.token_hex(12)
+            with connect() as c:
+                for key in ('claim_id','asset_id','case_id'):
+                    if data.get(key) and not c.execute('SELECT 1 FROM records WHERE id=? AND user_id=? AND kind=?',(data[key],uid,key.removesuffix('_id'))).fetchone(): raise ValueError('연결 자료 유형이 맞지 않거나 접근할 수 없습니다.')
+                for key in ('evidence','completion_evidence'):
+                    if data.get(key) and not c.execute('SELECT 1 FROM evidence WHERE id=? AND user_id=?',(data[key],uid)).fetchone(): raise ValueError('증빙 파일을 먼저 업로드하세요.')
+                if data.get('completion_evidence') and not c.execute('SELECT 1 FROM evidence WHERE id=? AND user_id=? AND record_id=?',(data['completion_evidence'],uid,rid)).fetchone(): raise ValueError('종결 증빙은 해당 사건에 연결되어야 합니다.')
+                old=c.execute('SELECT * FROM records WHERE id=?',(rid,)).fetchone()
                 if old and old['user_id']!=uid: return self.send(404,{'error':'자료 없음'})
                 if old and (p.get('version')!=old['version'] or old['kind']!=kind): return self.send(409,{'error':'자료가 변경되었습니다. 새로고침 후 다시 저장하세요.'})
                 c.execute('INSERT INTO records VALUES(?,?,?,?,1) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,version=records.version+1',(rid,uid,kind,json.dumps(data,ensure_ascii=False)))
