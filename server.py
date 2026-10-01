@@ -146,6 +146,8 @@ class Handler(BaseHTTPRequestHandler):
                     if doc['form_kind']=='preemption':
                         case=json.loads(doc['snapshot']['case']['payload'])
                         if case.get('type')!='share': raise ValueError('전체·공유물분할·일괄매각에는 이 우선매수 서식을 바로 확정할 수 없습니다.')
+                        source=doc['snapshot'].get('asset'); asset=json.loads(source['payload']) if source else {}
+                        if asset.get('ownership')!='공유지분 소유': raise ValueError('공유자 지위를 확인한 공유지분 자산을 연결하세요. 담보 목적 이전은 법률 검토 후 분류해야 합니다.')
                     doc.update(status='출력준비',checks=checks,approved_at=time.time())
                 elif action=='printed':
                     if doc.get('status')!='출력준비': raise ValueError('확정된 출력준비 문서만 출력확인할 수 있습니다.')
