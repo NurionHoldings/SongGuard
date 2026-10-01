@@ -33,7 +33,8 @@ def validate(kind,p):
     if len(json.dumps(p))>100000: raise ValueError('자료 크기 초과')
     if kind=='tax':
         from decimal import Decimal
-        date.fromisoformat(p['due'])
+        if p.get('due'): date.fromisoformat(p['due'])
+        if p.get('due_confirmed') is True and (not p.get('due') or not p.get('due_evidence') or p.get('role')!='본인 납부' or p.get('status')=='예상'): raise ValueError('실제 본인 납부기한과 원문 증빙을 확인하세요.')
         for k in ('notice_date','legal_date','paid_date'):
             if p.get(k): date.fromisoformat(p[k])
         amounts=[Decimal(str(p.get(k,0))) for k in ('amount','paid')]
@@ -124,6 +125,8 @@ class Handler(BaseHTTPRequestHandler):
                 records=[{**dict(r),'payload':json.loads(r['payload'])} for r in c.execute('SELECT id,kind,payload,version FROM records WHERE user_id=?',(uid,))]
                 logs=[dict(r) for r in c.execute('SELECT at,action,record_id FROM audit WHERE user_id=? ORDER BY id DESC LIMIT 100',(uid,))]
                 evidence=[dict(r) for r in c.execute('SELECT id,record_id,name FROM evidence WHERE user_id=?',(uid,))]
+            taxes={r['id']:r['payload'] for r in records if r['kind']=='tax'}
+            records=[r for r in records if r['kind']!='task' or not r['payload'].get('tax_id') or ((t:=taxes.get(r['payload']['tax_id'],{})).get('role')=='본인 납부' and t.get('due_confirmed') is True and t.get('due_evidence') and t.get('status')!='예상' and t.get('due') and r['payload'].get('due')==t['due'])]
             return self.send(200,{'csrf':s['csrf'],'records':records,'audit':logs,'evidence':evidence,'variables':VARIABLES,'stages':STAGES,'forms':schemas(),'connectors':{'court':'사람이 출력서류 접수 · 접수증 등록','registry':'미연동 · 등기 원문 등록','bank':'미연동 · 입금 증빙 등록'}})
         if path.startswith('/api/print/') and method=='GET':
             rid=path.rsplit('/',1)[-1]
@@ -213,19 +216,23 @@ class Handler(BaseHTTPRequestHandler):
             with connect() as c:
                 for key in ('claim_id','asset_id','case_id'):
                     if data.get(key) and not c.execute('SELECT 1 FROM records WHERE id=? AND user_id=? AND kind=?',(data[key],uid,key.removesuffix('_id'))).fetchone(): raise ValueError('연결 자료 유형이 맞지 않거나 접근할 수 없습니다.')
-                for key in ('evidence','completion_evidence'):
+                for key in ('evidence','completion_evidence','due_evidence'):
                     if data.get(key) and not c.execute('SELECT 1 FROM evidence WHERE id=? AND user_id=?',(data[key],uid)).fetchone(): raise ValueError('증빙 파일을 먼저 업로드하세요.')
                 if data.get('completion_evidence') and not c.execute('SELECT 1 FROM evidence WHERE id=? AND user_id=? AND record_id=?',(data['completion_evidence'],uid,rid)).fetchone(): raise ValueError('종결 증빙은 해당 사건에 연결되어야 합니다.')
+                if data.get('due_evidence') and not c.execute('SELECT 1 FROM evidence WHERE id=? AND user_id=? AND record_id=?',(data['due_evidence'],uid,rid)).fetchone(): raise ValueError('납부기한 증빙은 해당 세금에 연결되어야 합니다.')
                 old=c.execute('SELECT * FROM records WHERE id=?',(rid,)).fetchone()
                 if old and old['user_id']!=uid: return self.send(404,{'error':'자료 없음'})
+                if old and old['kind']=='task' and json.loads(old['payload']).get('tax_id'): raise ValueError('세금 납부기한은 세금 고지 메뉴에서 수정하세요.')
                 if old and (p.get('version')!=old['version'] or old['kind']!=kind): return self.send(409,{'error':'자료가 변경되었습니다. 새로고침 후 다시 저장하세요.'})
                 c.execute('INSERT INTO records VALUES(?,?,?,?,1) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,version=records.version+1',(rid,uid,kind,json.dumps(data,ensure_ascii=False)))
                 audit(c,uid,'수정' if old else '등록',rid)
                 if kind=='tax':
                     tid=hashlib.sha256((rid+'tax-due').encode()).hexdigest()[:24]; done=data['status'] in ('납부완료','취소확인')
-                    task={'title':('조세 배당순위 검토 · ' if data['role']=='채무자 조세채권' else '세금 신고·납부 확인 · ')+data['title'],'due':data['due'],'case_id':data.get('case_id',''),'tax_id':rid,'done':done,'evidence':data.get('completion_evidence','') if done else '', 'automated':True,'notes':'등록 고지기한 또는 검토일. 원문·납부확인·배당순위를 검토하세요. 이의신청만으로 징수 유예를 확정하지 않습니다.'}
-                    c.execute('INSERT INTO records VALUES(?,?,?,?,1) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,version=records.version+1',(tid,uid,'task',json.dumps(task,ensure_ascii=False)))
-                    audit(c,uid,'세금 기한 업무 갱신',tid)
+                    if data['role']=='본인 납부' and data.get('due_confirmed') is True and data.get('due') and data.get('due_evidence') and data['status']!='예상':
+                        task={'title':'확인된 세금 납부기한 · '+data['title'],'due':data['due'],'case_id':data.get('case_id',''),'tax_id':rid,'done':done,'evidence':data.get('completion_evidence','') if done else '', 'automated':True,'notes':'원문과 대조한 실제 납부기한: '+data['due']+' · 기한 증빙: '+data['due_evidence']}
+                        c.execute('INSERT INTO records VALUES(?,?,?,?,1) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,version=records.version+1',(tid,uid,'task',json.dumps(task,ensure_ascii=False)))
+                    else: c.execute('DELETE FROM records WHERE id=? AND user_id=?',(tid,uid))
+                    audit(c,uid,'확인된 세금 납부기한 갱신',tid)
                 if kind=='case':
                     schedules=[('auction_date','직접 입찰·공유자 우선매수 검토',7),('distribution_date','배당표·채권액·수령 요건 검토',3),('claim_deadline','채권신고·배당요구 필요 여부 및 제출 확인',3),('special_deadline','채권자 매수 특별지급 신고 검토',1)]
                     for key,label,lead in schedules:
