@@ -74,7 +74,12 @@ class Handler(BaseHTTPRequestHandler):
             file=ROOT/'static'/files[path]; return self.send(200,file.read_bytes(),types[file.suffix])
         if method=='POST':
             origin=self.headers.get('Origin')
-            if origin and origin.split('://',1)[-1]!=self.headers.get('Host'): return self.send(403,{'error':'외부 출처 요청 차단'})
+            if origin:
+                parsed_origin=urlsplit(origin)
+                public_origin=os.environ.get('SONG_GUARD_PUBLIC_ORIGIN','').rstrip('/')
+                own_origin=parsed_origin.scheme in ('http','https') and parsed_origin.netloc==self.headers.get('Host') and not parsed_origin.path and not parsed_origin.query and not parsed_origin.fragment
+                trusted_origin=bool(public_origin) and public_origin.startswith('https://') and origin==public_origin
+                if not (own_origin or trusted_origin): return self.send(403,{'error':'외부 출처 요청 차단'})
         if path in ('/api/register','/api/login') and method=='POST':
             with LOGIN_LOCK:
                 key=self.client_address[0]; attempts=[t for t in LOGIN_ATTEMPTS.get(key,[]) if t>time.time()-900]
