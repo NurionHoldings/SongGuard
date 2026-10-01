@@ -68,9 +68,9 @@ class Handler(BaseHTTPRequestHandler):
         if path=='/health': return self.send(200,{'status':'ok'})
         if not path.startswith('/api/'):
             if method!='GET': return self.send(405,{'error':'허용되지 않는 요청'})
-            files={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/paperwork.js':'paperwork.js','/print.css':'print.css','/print.js':'print.js'}
+            files={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/paperwork.js':'paperwork.js','/print.css':'print.css','/print.js':'print.js','/logo.png':'logo.png'}
             if path not in files: return self.send(404,{'error':'없음'})
-            types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}
+            types={'.png':'image/png','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}
             file=ROOT/'static'/files[path]; return self.send(200,file.read_bytes(),types[file.suffix])
         if method=='POST':
             origin=self.headers.get('Origin')
