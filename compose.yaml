@@ -1,0 +1,11 @@
+services:
+  songguard:
+    build: .
+    ports: ["127.0.0.1:8000:8000"]
+    environment:
+      SONG_GUARD_ALLOW_REGISTRATION: "false"
+      SONG_GUARD_SECURE_COOKIE: "true"
+    volumes: ["songguard-data:/data"]
+    restart: unless-stopped
+volumes:
+  songguard-data:
