@@ -94,8 +94,24 @@ const assert=require('node:assert/strict');
   }
   for(const kind of ['claim','case']){await page.locator('.command-strip [data-new='+kind+']').click();await page.locator('#editor').waitFor({state:'visible'});await page.locator('#close-editor').click();}
   await page.locator('#toast').waitFor({state:'hidden'});fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/desktop.png',fullPage:true});
-  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/mobile.png',fullPage:true});
-  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'mobile horizontal overflow');
+  for(const size of [{width:320,height:740},{width:390,height:844},{width:700,height:900},{width:844,height:390}]){
+   await page.setViewportSize(size);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'dashboard overflow '+size.width);
+  }
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.locator('#logout').isVisible(),true,'mobile logout remains reachable');
+  assert.equal(await page.locator('#logout').evaluate(b=>b.getBoundingClientRect().height>=44),true,'mobile touch target');
+  await page.screenshot({path:'test-results/mobile.png',fullPage:true});
+  await page.locator('nav [data-page=claim]').click();
+  assert.equal(await page.locator('.records-table td').first().getAttribute('data-label'),'자료명','record card labels');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'record cards overflow');
+  await page.screenshot({path:'test-results/mobile-records.png',fullPage:true});
+  await page.locator('[data-new=claim]').click();
+  assert.equal(await page.locator('#editor input[name=principal]').evaluate(i=>getComputedStyle(i).fontSize),'16px','mobile input avoids focus zoom');
+  assert.equal(await page.locator('#editor').evaluate(d=>d.scrollWidth<=d.clientWidth),true,'mobile form overflow');
+  await page.screenshot({path:'test-results/mobile-form.png',fullPage:true});await page.locator('#close-editor').click();
+  await page.locator('nav [data-page=filing]').click();await page.locator('#new-filing').click();
+  assert.equal(await page.locator('#paperwork').evaluate(d=>d.scrollWidth<=d.clientWidth),true,'mobile filing overflow');await page.locator('#close-paperwork').click();
+  await page.locator('nav [data-page=dashboard]').click();
   await page.locator('#home').click();await page.locator('#start').waitFor({state:'visible'});assert.equal(await page.locator('#shell').isVisible(),false);await page.locator('#enter-cockpit').click();await page.locator('#shell').waitFor({state:'visible'});assert.deepEqual(errors,[],'browser runtime errors');
   console.log('Browser workflow passed: account, claim, case, generated task, analysis, preemption, evidence, responsive layout.');
  } catch(e) {if(page){fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/failure.png',fullPage:true});console.error(await page.locator('#toast').textContent());}throw e;}
