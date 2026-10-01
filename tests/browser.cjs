@@ -15,7 +15,7 @@ const assert=require('node:assert/strict');
   browser=await chromium.launch({headless:true,executablePath:process.env.SONG_GUARD_BROWSER_PATH||undefined});const context=await browser.newContext({viewport:{width:1440,height:1000}});page=await context.newPage();
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:8092');
-  assert.equal(await page.locator('#shell').isVisible(),false);assert.equal(await page.locator('#auth').isVisible(),false);await page.locator('#start').waitFor({state:'visible'});fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/start.png',fullPage:true});assert.equal(await page.locator('#enter-cockpit').isVisible(),false);await page.locator('#start-account').click();await page.locator('#auth').waitFor({state:'visible'});
+  assert.equal(await page.locator('#shell').isVisible(),false);assert.equal(await page.locator('#auth').isVisible(),false);await page.locator('#start').waitFor({state:'visible'});assert.equal(await page.locator('.start-logo').evaluate(img=>img.getAnimations().length),2,'start logo animation applied');fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/start.png',fullPage:true});assert.equal(await page.locator('#enter-cockpit').isVisible(),false);await page.locator('#start-account').click();await page.locator('#auth').waitFor({state:'visible'});
   await page.locator('[name=username]').fill('browser-owner');await page.locator('[name=password]').fill('browser-test-password-123');
   assert.equal(await page.locator('#register').isVisible(),false);
   await page.evaluate(runtime=>window.songGuardTestRuntime=runtime,netlifyRuntime?'netlify':'python');
@@ -88,6 +88,7 @@ const assert=require('node:assert/strict');
   await page.locator('nav [data-page=dashboard]').click();
   assert.equal(await page.locator('.brand-logo').evaluate(img=>img.complete&&img.naturalWidth>0),true,'brand logo loads');
   const animationFrames=await page.locator('.brand-logo').evaluate(img=>{const animations=img.getAnimations();const sample=t=>{animations.forEach(a=>{a.pause();a.currentTime=t});const s=getComputedStyle(img);return {transform:s.transform,filter:s.filter}};const start=sample(0),later=sample(3000);animations.forEach(a=>a.play());return {count:animations.length,start,later}});
+  const liveBefore=await page.locator('.brand-logo').evaluate(img=>getComputedStyle(img).transform);await page.waitForTimeout(400);const liveAfter=await page.locator('.brand-logo').evaluate(img=>getComputedStyle(img).transform);assert.notEqual(liveBefore,liveAfter,'logo advances automatically without interaction');
   assert.equal(animationFrames.count,2,'logo motion and colour animations');assert.notEqual(animationFrames.start.transform,animationFrames.later.transform,'logo moves');assert.notEqual(animationFrames.start.filter,animationFrames.later.filter,'logo colour changes');
   await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.brand-logo').evaluate(img=>getComputedStyle(img).animationName),'none','reduced motion disables animation');await page.emulateMedia({reducedMotion:'no-preference'});
 

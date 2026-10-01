@@ -15,10 +15,10 @@ aside,.card,.grid,.row-item>div{min-width:0}nav{max-width:100%}.row-item{overflo
 
 .brand-lockup>span{font-size:23px;white-space:nowrap;color:#e5edf5}.brand-lockup>span>span{color:#69d8e2}.brand-logo{width:40px;height:40px}
 
-/* Living logo: slow breathing movement and a continuous, gentle colour cycle. */
-.auth-logo,.brand-logo{transform-origin:50% 55%;animation:sg-logo-breathe 6s ease-in-out infinite,sg-logo-colour 24s ease-in-out infinite;filter:drop-shadow(0 0 3px #58d8e855)}
-@keyframes sg-logo-breathe{0%,100%{transform:translateY(0) rotate(-2deg) scale(1)}50%{transform:translateY(-2px) rotate(2deg) scale(1.045)}}
-@keyframes sg-logo-colour{0%,100%{filter:hue-rotate(0deg) saturate(1.05) brightness(1) drop-shadow(0 0 3px #58d8e855)}33%{filter:hue-rotate(45deg) saturate(1.18) brightness(1.08) drop-shadow(0 0 6px #8a9ff077)}66%{filter:hue-rotate(-45deg) saturate(1.12) brightness(1.03) drop-shadow(0 0 5px #65e5b866)}}
+/* Living logo: visible breathing motion and a smooth cyan/violet/green cycle. */
+.auth-logo,.brand-logo{transform-origin:50% 55%;animation:sg-logo-breathe 4.8s ease-in-out infinite,sg-logo-colour 9s ease-in-out infinite;filter:drop-shadow(0 0 3px #58d8e855)}
+@keyframes sg-logo-breathe{0%,100%{transform:translateY(2px) rotate(-6deg) scale(.96)}50%{transform:translateY(-6px) rotate(6deg) scale(1.12)}}
+@keyframes sg-logo-colour{0%,100%{filter:hue-rotate(0deg) saturate(1.05) brightness(1) drop-shadow(0 0 3px #58d8e855)}33%{filter:hue-rotate(110deg) saturate(1.5) brightness(1.18) drop-shadow(0 0 12px #a694f0aa)}66%{filter:hue-rotate(-100deg) saturate(1.4) brightness(1.12) drop-shadow(0 0 10px #65e5b8aa)}}
 @media(prefers-reduced-motion:reduce){.auth-logo,.brand-logo{animation:none;transform:none;filter:none}}
 @media print{.auth-logo,.brand-logo{animation:none;transform:none;filter:none}}
 
