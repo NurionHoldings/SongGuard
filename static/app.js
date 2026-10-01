@@ -53,7 +53,7 @@ load();
 const recordChannel=typeof BroadcastChannel==='function'?new BroadcastChannel('songguard-record-change'):null;
 let syncBusy=false;
 function signalChange(){recordChannel?.postMessage({type:'records-changed'})}
-async function syncRecords(){if(syncBusy||!csrf||!cockpitOpen||document.hidden||document.querySelector('dialog[open]'))return;syncBusy=true;try{const next=await api('state');if(!cockpitOpen||!csrf)return;const changed=JSON.stringify(next.records)!==JSON.stringify(state.records)||JSON.stringify(next.evidence)!==JSON.stringify(state.evidence);state=next;csrf=next.csrf;if(changed)render()}catch(e){if(csrf)toast('자동 동기화를 재시도합니다. 저장 전 새로고침을 확인하세요.')}finally{syncBusy=false}}
+async function syncRecords(){if(syncBusy||!csrf||!cockpitOpen||document.hidden||document.querySelector('dialog[open]'))return;syncBusy=true;try{const next=await api('state');if(!cockpitOpen||!csrf||document.querySelector('dialog[open]'))return;const changed=JSON.stringify(next.records)!==JSON.stringify(state.records)||JSON.stringify(next.evidence)!==JSON.stringify(state.evidence);state=next;csrf=next.csrf;if(changed){const x=window.scrollX,y=window.scrollY;render();window.scrollTo(x,y)}}catch(e){if(csrf)toast('자동 동기화를 재시도합니다. 저장 전 새로고침을 확인하세요.')}finally{syncBusy=false}}
 if(recordChannel)recordChannel.onmessage=()=>syncRecords();
 setInterval(syncRecords,15000);
 window.addEventListener('focus',syncRecords);
