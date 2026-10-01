@@ -3,7 +3,7 @@ from pathlib import Path
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from http.cookies import SimpleCookie
 from datetime import date, timedelta
-from core import ledger, scenario, preemption, VARIABLES
+from core import ledger, scenario, preemption, VARIABLES, money
 from drafts import draft
 from paperwork import schemas, missing, html as filing_html, CHECKS
 from urllib.parse import parse_qs, urlsplit
@@ -43,6 +43,12 @@ def validate(kind,p):
         if p.get('role') not in ('본인 납부','채무자 조세채권') or p.get('status') not in ('예상','고지확인','부분납부','납부완료','이의신청','취소확인'): raise ValueError('세금 구분과 상태를 확인하세요.')
         if p['status']=='납부완료' and (p['role']!='본인 납부' or not p.get('paid_date') or not p.get('completion_evidence') or amounts[0]!=amounts[1]): raise ValueError('납부액·납부일·증빙을 확인하세요.')
         if p['status']=='취소확인' and not p.get('completion_evidence'): raise ValueError('취소 결정 증빙이 필요합니다.')
+    if kind=='asset':
+        if not isinstance(p.get('address'),str) or not p['address'].strip(): raise ValueError('자산 소재지를 입력하세요.')
+        if p.get('ownership') not in ('직접 소유','근저당','공유지분 소유','담보 목적 지분이전','담보가등기','기타·검토필요'): raise ValueError('권리 유형을 확인하세요.')
+        if p.get('registered'): date.fromisoformat(p['registered'])
+        for k in ('area','value'):
+            if p.get(k): money(p[k])
     if kind=='claim': ledger(p)
     if kind=='case':
         if p.get('stage') not in STAGES: raise ValueError('잘못된 사건 단계')

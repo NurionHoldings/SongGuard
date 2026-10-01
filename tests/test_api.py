@@ -56,7 +56,7 @@ class API(unittest.TestCase):
     def test_paper_filing_lifecycle(self):
         from paperwork import COMMON,EXTRA,CHECKS
         c,csrf=self.user('paper-owner');other,other_csrf=self.user('paper-other')
-        _,body,_=self.request(c,'/api/record',{'kind':'asset','payload':{'title':'Mortgage','ownership':'근저당'}},csrf);aid=json.loads(body)['id']
+        _,body,_=self.request(c,'/api/record',{'kind':'asset','payload':{'title':'Mortgage','address':'가상시 가상동 1','ownership':'근저당'}},csrf);aid=json.loads(body)['id']
         _,body,_=self.request(c,'/api/record',{'kind':'case','payload':{'title':'Paper case','stage':'집행준비','type':'share','asset_id':aid}},csrf);cid=json.loads(body)['id']
         data={k:'가상 입력' for k,_ in COMMON+EXTRA['petition']};data.update(signed_date='2026-10-01',amount='1000000')
         _,body,_=self.request(c,'/api/filing',{'action':'save','case_id':cid,'form_kind':'petition','data':data},csrf);fid=json.loads(body)['id']

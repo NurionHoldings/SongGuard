@@ -26,11 +26,13 @@ const assert=require('node:assert/strict');
   await page.locator('#add-payment').click();await page.locator('.payment-amount').fill('10000');
   await page.locator('#record-form button[type=submit]').click();await page.locator('#editor').waitFor({state:'hidden'});
   await page.getByText('테스트 담보채권',{exact:true}).waitFor();
-  await page.locator('nav [data-page=asset]').click();await page.locator('[data-new=asset]').click();
+  const mirror=await context.newPage();await mirror.goto('http://127.0.0.1:8092');await mirror.locator('#enter-cockpit').click();await mirror.locator('nav [data-page=asset]').click();
+  await page.locator('nav [data-page=dashboard]').click();await page.locator('.command-strip [data-new=asset]').click();
   await page.locator('#record-form [name=title]').fill('테스트 공유지분');await page.locator('[name=address]').fill('가상 주소');
   await page.locator('[name=ownership]').selectOption('공유지분 소유');await page.locator('[name=share]').fill('1/10');
   await page.locator('[name=claim_id]').selectOption({label:'테스트 담보채권'});
   await page.locator('#record-form button[type=submit]').click();await page.locator('#editor').waitFor({state:'hidden'});
+  await page.getByText('테스트 공유지분',{exact:true}).waitFor();await mirror.getByText('테스트 공유지분',{exact:true}).waitFor({timeout:20000});await mirror.reload();await mirror.locator('#enter-cockpit').click();await mirror.locator('nav [data-page=asset]').click();await mirror.getByText('테스트 공유지분',{exact:true}).waitFor();await mirror.close();
   await page.locator('nav [data-page=case]').click();await page.locator('[data-new=case]').click();
   await page.locator('#record-form [name=title]').fill('테스트 경매');await page.locator('[name=number]').fill('2026타경00000');
   await page.locator('[name=court]').fill('가상법원');await page.locator('[name=claim_id]').selectOption({label:'테스트 담보채권'});
@@ -70,7 +72,7 @@ const assert=require('node:assert/strict');
     const st=await (await fetch('/api/state')).json();let caseRecord=st.records.find(r=>r.kind==='case'&&r.payload.type==='share');
     const post=async (route,body)=>{const r=await fetch('/api/'+route,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':st.csrf},body:JSON.stringify(body)});const v=await r.json();if(!r.ok)throw Error(v.error);return v;};
     if(kind==='petition'){
-     const asset=await post('record',{kind:'asset',payload:{title:'가상 근저당 자산','ownership':'근저당'}});
+     const asset=await post('record',{kind:'asset',payload:{title:'가상 근저당 자산',address:'가상시 가상동 1','ownership':'근저당'}});
      caseRecord={id:(await post('record',{kind:'case',payload:{title:'가상 임의경매 서식 검증','stage':'집행준비',type:'whole',asset_id:asset.id}})).id};
     }
     const data=Object.fromEntries(st.forms[kind].fields.map(f=>[f.key,'가상 검증 자료']));
@@ -92,7 +94,7 @@ const assert=require('node:assert/strict');
   for(const selector of ['.annunciator[data-filter=overdue]','.annunciator[data-filter=today]','.annunciator[data-filter=pending]','.annunciator[data-page=event]','.instrument[data-page=task]','.instrument[data-page=claim]','.instrument[data-page=case]','.command-strip [data-page=filing]','.command-strip [data-page=analysis]','.command-strip [data-page=audit]','.connector [data-page=filing]','.connector [data-page=asset]','.connector [data-page=audit]']){
    await page.locator('#content '+selector).first().click();assert.equal(await page.locator('#content').textContent().then(x=>x.length>0),true,'linked page renders: '+selector);await page.locator('nav [data-page=dashboard]').click();
   }
-  for(const kind of ['claim','case']){await page.locator('.command-strip [data-new='+kind+']').click();await page.locator('#editor').waitFor({state:'visible'});await page.locator('#close-editor').click();}
+  for(const kind of ['asset','claim','case']){await page.locator('.command-strip [data-new='+kind+']').click();await page.locator('#editor').waitFor({state:'visible'});await page.locator('#close-editor').click();}
   await page.locator('#toast').waitFor({state:'hidden'});fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/desktop.png',fullPage:true});
   await page.locator('nav [data-page=tax]').click();await page.locator('[data-new=tax]').click();
   await page.locator('#record-form [name=title]').fill('테스트 세금 고지');await page.locator('#record-form [name=status]').selectOption('고지확인');await page.locator('#record-form [name=amount]').fill('10000');await page.locator('#record-form [name=paid]').fill('0');await page.locator('#record-form button[type=submit]').click();await page.locator('#editor').waitFor({state:'hidden'});await page.getByText('테스트 세금 고지',{exact:true}).waitFor();await page.locator('nav [data-page=task]').click();assert.equal(await page.getByText('확인된 세금 납부기한 · 테스트 세금 고지',{exact:true}).count(),0,'unverified tax must not create notification');await page.locator('nav [data-page=dashboard]').click();
