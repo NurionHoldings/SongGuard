@@ -1,7 +1,7 @@
 'use strict';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const kr=v=>Number(v||0).toLocaleString('ko-KR')+'원', today=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
-let state={}, page='dashboard', editing=null, csrf='', pageFilter='';
+let state={}, page='dashboard', editing=null, csrf='', pageFilter='', cockpitOpen=false, entryRequested=false;
 const pages={dashboard:'관리자 운항 계기판',claim:'채권 원장',asset:'담보 · 공유지분',case:'경매 사건',filing:'서류 생성 · 접수',task:'기한 · 조치',event:'변수 대응',analysis:'입찰 · 우선매수',audit:'증빙 · 감사기록'};
 const fields={
  claim:[['title','채권명'],['debtor','채무자'],['creditor','채권자·신고인'],['creditor_address','채권자 주소'],['debtor_address','채무자 주소'],['default_basis','변제기·기한이익 상실 근거','textarea'],['principal','원금','number'],['rate','적용 연이율 (%)','number'],['start','대여일','date'],['as_of','계산 기준일','date'],['cap','담보 채권최고액','number'],['costs','비용','number'],['overdue','연체 시작일','date'],['payments','변제내역','payments'],['notes','약정·이율 적용 근거 및 검토 메모','textarea']],
@@ -12,12 +12,17 @@ const fields={
 };
 function toast(v){$('#toast').textContent=v;$('#toast').style.display='block';setTimeout(()=>$('#toast').style.display='none',5000)}
 async function api(path,body){const r=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:body===undefined?undefined:JSON.stringify(body)});const v=await r.json();if(!r.ok){if(r.status===401)showAuth();throw Error(v.error||'요청 실패')}return v}
-function showAuth(){$('#auth').hidden=false;$('#shell').hidden=true}
-async function load(){try{state=await api('state');csrf=state.csrf;$('#auth').hidden=true;$('#shell').hidden=false;render()}catch(e){if(e.message!=='로그인이 필요합니다.')toast(e.message)}}
+function showStart(){cockpitOpen=false;entryRequested=false;$('#start').hidden=false;$('#auth').hidden=true;$('#shell').hidden=true;document.querySelectorAll('dialog[open]').forEach(d=>d.close());$('#start-account').textContent=csrf?'로그아웃':'관리자 로그인';$('#start-status').textContent=csrf?'관리자 인증 완료 · 관제실을 열어 업무를 시작하세요.':'관리자 계정으로 접속하세요.'}
+function showLogin(){cockpitOpen=false;$('#start').hidden=true;$('#auth').hidden=false;$('#shell').hidden=true;$('#auth-form input').focus()}
+function showAuth(){csrf='';state={};if(entryRequested||cockpitOpen)showLogin();else showStart()}
+async function load(){try{state=await api('state');csrf=state.csrf;if(cockpitOpen||entryRequested){cockpitOpen=true;$('#start').hidden=true;$('#auth').hidden=true;$('#shell').hidden=false;render()}else showStart()}catch(e){if(e.message!=='로그인이 필요합니다.')toast(e.message)}}
+$('#enter-cockpit').onclick=()=>{entryRequested=true;page='dashboard';pageFilter='';if(csrf){cockpitOpen=true;load()}else showLogin()};
+$('#start-account').onclick=async()=>{if(csrf){await api('logout',{});csrf='';state={};showStart()}else{entryRequested=false;showLogin()}};
+$('#home').onclick=showStart;$('#auth-home').onclick=showStart;
 $('#auth-form').onsubmit=async e=>{e.preventDefault();await auth('login')};
 $('#register').onclick=()=>auth('register');
 async function auth(route){const form=$('#auth-form');if(!form.reportValidity())return;try{const p=Object.fromEntries(new FormData(form));const r=await api(route,p);csrf=r.csrf;form.reset();await load()}catch(e){toast(e.message)}}
-$('#logout').onclick=async()=>{await api('logout',{});state={};csrf='';showAuth()};$('#refresh').onclick=load;
+$('#logout').onclick=async()=>{await api('logout',{});state={};csrf='';showStart()};$('#refresh').onclick=load;
 $('#close-editor').onclick=()=>$('#editor').close();$('#close-detail').onclick=()=>$('#detail').close();
 function rows(kind){return (state.records||[]).filter(r=>r.kind===kind)}
 function title(id){return state.records.find(r=>r.id===id)?.payload.title||'연결 없음'}

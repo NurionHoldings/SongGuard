@@ -14,9 +14,10 @@ const assert=require('node:assert/strict');
   browser=await chromium.launch({headless:true,executablePath:process.env.SONG_GUARD_BROWSER_PATH||undefined});const context=await browser.newContext({viewport:{width:1440,height:1000}});page=await context.newPage();
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:8092');
+  assert.equal(await page.locator('#shell').isVisible(),false);assert.equal(await page.locator('#auth').isVisible(),false);await page.locator('#start').waitFor({state:'visible'});fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/start.png',fullPage:true});await page.locator('#enter-cockpit').click();await page.locator('#auth').waitFor({state:'visible'});
   await page.locator('[name=username]').fill('browser-owner');await page.locator('[name=password]').fill('browser-test-password-123');
   assert.equal(await page.locator('#register').isVisible(),false);
-  const signup=await page.evaluate(async()=>{const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'browser-owner',password:'browser-test-password-123'})});return r.status});assert.equal(signup,200);await page.reload();await page.locator('#shell').waitFor({state:'visible'});
+  const signup=await page.evaluate(async()=>{const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'browser-owner',password:'browser-test-password-123'})});return r.status});assert.equal(signup,200);await page.reload();await page.locator('#start').waitFor({state:'visible'});assert.equal(await page.locator('#shell').isVisible(),false);await page.locator('#enter-cockpit').click();await page.locator('#shell').waitFor({state:'visible'});
   await page.locator('nav [data-page=claim]').click();await page.locator('[data-new=claim]').click();
   await page.locator('#record-form [name=title]').fill('테스트 담보채권');await page.locator('[name=debtor]').fill('가상 채무자');
   await page.locator('[name=principal]').fill('100000000');await page.locator('[name=rate]').fill('10');await page.locator('[name=cap]').fill('120000000');
@@ -93,7 +94,7 @@ const assert=require('node:assert/strict');
   await page.locator('#toast').waitFor({state:'hidden'});fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/mobile.png',fullPage:true});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'mobile horizontal overflow');
-  assert.deepEqual(errors,[],'browser runtime errors');
+  await page.locator('#home').click();await page.locator('#start').waitFor({state:'visible'});assert.equal(await page.locator('#shell').isVisible(),false);await page.locator('#enter-cockpit').click();await page.locator('#shell').waitFor({state:'visible'});assert.deepEqual(errors,[],'browser runtime errors');
   console.log('Browser workflow passed: account, claim, case, generated task, analysis, preemption, evidence, responsive layout.');
  } catch(e) {if(page){fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/failure.png',fullPage:true});console.error(await page.locator('#toast').textContent());}throw e;}
  finally {if(browser)await browser.close();server.kill();fs.rmSync(temp,{recursive:true,force:true});}
