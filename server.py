@@ -81,7 +81,8 @@ class Handler(BaseHTTPRequestHandler):
                 if len(attempts)>=20: return self.send(429,{'error':'로그인 시도가 많습니다. 15분 후 다시 시도하세요.'})
                 LOGIN_ATTEMPTS[key]=attempts+[time.time()]
             p=json.loads(self.body()); username=p['username'].strip(); secret=p['password']
-            if not 3<=len(username)<=80 or not 12<=len(secret)<=200: raise ValueError('아이디 3~80자, 비밀번호 12~200자가 필요합니다.')
+            if not 3<=len(username)<=80 or not 1<=len(secret)<=200: raise ValueError('아이디 3~80자, 비밀번호 1~200자가 필요합니다.')
+            if path.endswith('register') and len(secret)<12: raise ValueError('신규 가입 비밀번호는 12자 이상이어야 합니다.')
             with connect() as c:
                 user=c.execute('SELECT * FROM users WHERE username=?',(username,)).fetchone()
                 if path.endswith('register'):

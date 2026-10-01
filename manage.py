@@ -4,12 +4,12 @@ from pathlib import Path
 import server
 
 p=argparse.ArgumentParser(); sub=p.add_subparsers(dest='command',required=True)
-u=sub.add_parser('create-user'); u.add_argument('username')
+u=sub.add_parser('create-user'); u.add_argument('username'); u.add_argument('--allow-short-password',action='store_true',help='운영자가 지정한 짧은 비밀번호 허용')
 b=sub.add_parser('backup'); b.add_argument('destination')
 a=p.parse_args(); server.init()
 if a.command=='create-user':
-    password=getpass.getpass('비밀번호 (12자 이상): ')
-    if not 3<=len(a.username)<=80 or not 12<=len(password)<=200: raise SystemExit('아이디/비밀번호 길이를 확인하세요.')
+    password=getpass.getpass('비밀번호: ')
+    if not 3<=len(a.username)<=80 or not (1 if a.allow_short_password else 12)<=len(password)<=200: raise SystemExit('아이디/비밀번호 길이를 확인하세요.')
     if password!=getpass.getpass('비밀번호 확인: '): raise SystemExit('비밀번호 불일치')
     salt=secrets.token_hex(16)
     with server.connect() as c: c.execute('INSERT INTO users(username,salt,password) VALUES(?,?,?)',(a.username,salt,server.password(password,salt)))
