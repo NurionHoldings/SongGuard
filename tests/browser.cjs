@@ -7,7 +7,8 @@ const path=require('node:path');
 const assert=require('node:assert/strict');
 (async()=>{
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'songguard-ui-'));
- const server=spawn('python',['server.py'],{env:{...process.env,PORT:'8092',SONG_GUARD_DB:path.join(temp,'test.db'),SONG_GUARD_ALLOW_REGISTRATION:'true',SONG_GUARD_SECURE_COOKIE:'false'},stdio:'inherit'});
+ const netlifyRuntime=process.env.SONG_GUARD_TEST_RUNTIME==='netlify';
+ const server=spawn(netlifyRuntime?'node':'python',netlifyRuntime?['tests/netlify-test-server.mjs']:['server.py'],{env:{...process.env,PORT:'8092',SONG_GUARD_DB:path.join(temp,'test.db'),SONG_GUARD_ALLOW_REGISTRATION:'true',SONG_GUARD_SECURE_COOKIE:'false'},stdio:'inherit'});
  let browser,page;
  try {
   for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:8092/health')).ok)break}catch{}await new Promise(r=>setTimeout(r,100));}
@@ -17,7 +18,8 @@ const assert=require('node:assert/strict');
   assert.equal(await page.locator('#shell').isVisible(),false);assert.equal(await page.locator('#auth').isVisible(),false);await page.locator('#start').waitFor({state:'visible'});fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/start.png',fullPage:true});assert.equal(await page.locator('#enter-cockpit').isVisible(),false);await page.locator('#start-account').click();await page.locator('#auth').waitFor({state:'visible'});
   await page.locator('[name=username]').fill('browser-owner');await page.locator('[name=password]').fill('browser-test-password-123');
   assert.equal(await page.locator('#register').isVisible(),false);
-  const signup=await page.evaluate(async()=>{const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'browser-owner',password:'browser-test-password-123'})});return r.status});assert.equal(signup,200);await page.reload();await page.locator('#start').waitFor({state:'visible'});assert.equal(await page.locator('#shell').isVisible(),false);await page.locator('#enter-cockpit').click();await page.locator('#shell').waitFor({state:'visible'});
+  await page.evaluate(runtime=>window.songGuardTestRuntime=runtime,netlifyRuntime?'netlify':'python');
+  const signup=await page.evaluate(async()=>{const r=await fetch((window.songGuardTestRuntime==='netlify'?'/api/login':'/api/register'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'browser-owner',password:'browser-test-password-123'})});return r.status});assert.equal(signup,200);await page.reload();await page.locator('#start').waitFor({state:'visible'});assert.equal(await page.locator('#shell').isVisible(),false);await page.locator('#enter-cockpit').click();await page.locator('#shell').waitFor({state:'visible'});
   await page.locator('nav [data-page=claim]').click();await page.locator('[data-new=claim]').click();
   await page.locator('#record-form [name=title]').fill('테스트 담보채권');await page.locator('[name=debtor]').fill('가상 채무자');
   await page.locator('[name=principal]').fill('100000000');await page.locator('[name=rate]').fill('10');await page.locator('[name=cap]').fill('120000000');
@@ -65,14 +67,14 @@ const assert=require('node:assert/strict');
   // Render each form with explicit fictitious facts for PDF layout inspection.
   for(const kind of ['petition','statement','demand','preemption','special','correction','payment']){
    const printHtml=await page.evaluate(async kind=>{
-    const st=await (await fetch('/api/state')).json();let caseRecord=st.records.find(r=>r.kind==='case');
+    const st=await (await fetch('/api/state')).json();let caseRecord=st.records.find(r=>r.kind==='case'&&r.payload.type==='share');
     const post=async (route,body)=>{const r=await fetch('/api/'+route,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':st.csrf},body:JSON.stringify(body)});const v=await r.json();if(!r.ok)throw Error(v.error);return v;};
     if(kind==='petition'){
      const asset=await post('record',{kind:'asset',payload:{title:'가상 근저당 자산','ownership':'근저당'}});
      caseRecord={id:(await post('record',{kind:'case',payload:{title:'가상 임의경매 서식 검증','stage':'집행준비',type:'whole',asset_id:asset.id}})).id};
     }
     const data=Object.fromEntries(st.forms[kind].fields.map(f=>[f.key,'가상 검증 자료']));
-    Object.assign(data,{signed_date:'2026-10-01',number:'2026타경00000',amount:'1000000',price:'2000000',dividend:'1000000',creditor:'가상 채권자',court:'가상 지방법원',attachments:'가상 계약서 1부\n가상 등기사항증명서 1부',property:'가상 토지: 가상시 가상구 가상동 1-1\n지목: 대, 면적: 100㎡\n실행 대상: 가상 채무자의 10분의 9 지분'});
+    Object.assign(data,{signed_date:'2026-10-01',order_date:'2026-10-01',number:'2026타경00000',amount:'1000000',price:'2000000',dividend:'1000000',creditor:'가상 채권자',court:'가상 지방법원',attachments:'가상 계약서 1부\n가상 등기사항증명서 1부',property:'가상 토지: 가상시 가상구 가상동 1-1\n지목: 대, 면적: 100㎡\n실행 대상: 가상 채무자의 10분의 9 지분'});
     const rr=await fetch('/api/filing',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':st.csrf},body:JSON.stringify({action:'save',case_id:caseRecord.id,form_kind:kind,data})});const saved=await rr.json();
     if(!rr.ok)throw Error(saved.error);
     await post('filing',{action:'approve',id:saved.id,version:1,checks:Object.fromEntries(Object.keys(st.forms[kind].checks).map(k=>[k,true]))});

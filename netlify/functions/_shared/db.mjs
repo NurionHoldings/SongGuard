@@ -1,0 +1,8 @@
+import {getDatabase} from '@netlify/database';
+import schema from './schema.json' with {type:'json'};
+export function database(env){const old=env('NETLIFY_DATABASE_URL');return getDatabase(old&&!env('NETLIFY_DB_URL')?{connectionString:old}:undefined).pool}
+export async function transaction(pool,uid,fn,{readOnly=false}={}){const c=await pool.connect();try{await c.query(readOnly?'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY':'BEGIN');if(uid&&!readOnly)await c.query('SELECT id FROM sg_users WHERE id=$1 FOR UPDATE',[uid]);const result=await fn(c);await c.query('COMMIT');return result}catch(e){await c.query('ROLLBACK').catch(()=>{});throw e}finally{c.release()}}
+export async function audit(c,uid,action,rid){await c.query('INSERT INTO sg_audit(user_id,action,record_id) VALUES($1,$2,$3)',[uid,action,rid])}
+export async function record(c,uid,rid,kind){const {rows}=await c.query('SELECT id,kind,payload,version FROM sg_records WHERE id=$1 AND user_id=$2'+(kind?' AND kind=$3':''),kind?[rid,uid,kind]:[rid,uid]);return rows[0]}
+export async function save(c,uid,id,kind,payload){await c.query('INSERT INTO sg_records(id,user_id,kind,payload) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,version=sg_records.version+1',[id,uid,kind,JSON.stringify(payload)])}
+export async function ensureSchema(pool){const sql=schema;if((await pool.query("SELECT to_regclass('public.sg_users') AS existing")).rows[0].existing)return;const c=await pool.connect();try{await c.query('BEGIN');await c.query('SELECT pg_advisory_xact_lock(739105225)');await c.query(sql);await c.query('COMMIT');ensureSchema.ready??=new WeakSet();ensureSchema.ready.add(pool)}catch(e){await c.query('ROLLBACK').catch(()=>{});throw e}finally{c.release()}}

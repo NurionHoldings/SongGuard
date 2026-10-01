@@ -92,4 +92,4 @@ node --check static/app.js
 
 ## Netlify 배포
 
-[배포 준비 및 운영 검증](docs/NETLIFY_DEPLOY.md)을 따르세요. 화면은 Netlify, Python API/SQLite는 영속 볼륨이 있는 별도 HTTPS 서버에 배치합니다. 빌드 환경변수 `SONG_GUARD_API_ORIGIN`과 서버 환경변수 `SONG_GUARD_PUBLIC_ORIGIN`을 실제 주소로 지정해야 합니다. `netlify.toml`과 빌드 스크립트가 준비되어 있으며, 외부 서버 주소가 없으면 빌드를 차단합니다. 실제 운영 도메인 배포와 프록시 로그인 검증은 별도입니다.
+[GitHub → Netlify 전체 서비스 배포](docs/NETLIFY_DEPLOY.md)를 따르세요. 기본 배포는 Netlify Functions + Netlify Database(PostgreSQL) + Blobs이며 외부 Python 서버나 `SONG_GUARD_API_ORIGIN` 없이 빌드됩니다. 계정 비밀 설정은 Functions 전용 환경변수로 관리합니다. 위 Python/Docker 실행은 별도의 로컬·자가 운영 경로입니다.

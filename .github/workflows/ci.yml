@@ -17,9 +17,13 @@ jobs:
       - run: node --check static/app.js
       - run: node --check static/paperwork.js
       - run: python -m compileall -q core.py server.py manage.py
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
       - run: npm install --no-save playwright@1.58.2
       - run: npx playwright install --with-deps chromium
       - run: node tests/browser.cjs
+      - run: SONG_GUARD_TEST_RUNTIME=netlify node tests/browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

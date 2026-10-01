@@ -1,9 +1,9 @@
 [build]
-  command = "python3 scripts/build_netlify.py"
+  command = "npm run build"
   publish = "dist"
 
 [build.environment]
-  PYTHON_VERSION = "3.12"
+  NODE_VERSION = "24"
 
 [[headers]]
   for = "/*"
@@ -13,3 +13,8 @@
     Referrer-Policy = "no-referrer"
     Cache-Control = "no-store"
     Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  external_node_modules = ["@netlify/database", "@netlify/blobs", "@netlify/identity", "pg"]

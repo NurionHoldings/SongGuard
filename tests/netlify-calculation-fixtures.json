@@ -1,0 +1,178 @@
+[
+  {
+    "input": {
+      "principal": "100000000",
+      "rate": "12",
+      "start": "2025-01-01",
+      "as_of": "2026-10-01",
+      "cap": "999999999",
+      "costs": "15000",
+      "payments": [
+        {
+          "date": "2025-05-01",
+          "amount": "500"
+        },
+        {
+          "date": "2026-02-01",
+          "amount": "800"
+        }
+      ]
+    },
+    "expected": {
+      "principal": 100000000,
+      "interest": 20975342,
+      "costs": 13700,
+      "total": 120989042,
+      "secured_estimate": 120989042,
+      "rows": [
+        {
+          "date": "2025-05-01",
+          "payment": 500,
+          "principal": 100000000,
+          "interest": 3945205,
+          "costs": 14500
+        },
+        {
+          "date": "2026-02-01",
+          "payment": 800,
+          "principal": 100000000,
+          "interest": 13019178,
+          "costs": 13700
+        }
+      ],
+      "assumptions": "단일 연이율·365일 단리·비용→이자→원금 충당. 약정/법률상 이율·충당·담보범위 확인 후 사용."
+    }
+  },
+  {
+    "input": {
+      "principal": "1000001",
+      "rate": "7.35",
+      "start": "2025-01-01",
+      "as_of": "2026-10-01",
+      "cap": "999999999",
+      "costs": "15000",
+      "payments": [
+        {
+          "date": "2025-05-01",
+          "amount": "500"
+        },
+        {
+          "date": "2026-02-01",
+          "amount": "800"
+        }
+      ]
+    },
+    "expected": {
+      "principal": 1000001,
+      "interest": 128474,
+      "costs": 13700,
+      "total": 1142175,
+      "secured_estimate": 1142175,
+      "rows": [
+        {
+          "date": "2025-05-01",
+          "payment": 500,
+          "principal": 1000001,
+          "interest": 24164,
+          "costs": 14500
+        },
+        {
+          "date": "2026-02-01",
+          "payment": 800,
+          "principal": 1000001,
+          "interest": 79743,
+          "costs": 13700
+        }
+      ],
+      "assumptions": "단일 연이율·365일 단리·비용→이자→원금 충당. 약정/법률상 이율·충당·담보범위 확인 후 사용."
+    }
+  },
+  {
+    "input": {
+      "principal": "210000000",
+      "rate": "19.9",
+      "start": "2025-01-01",
+      "as_of": "2026-10-01",
+      "cap": "999999999",
+      "costs": "15000",
+      "payments": [
+        {
+          "date": "2025-05-01",
+          "amount": "500"
+        },
+        {
+          "date": "2026-02-01",
+          "amount": "800"
+        }
+      ]
+    },
+    "expected": {
+      "principal": 210000000,
+      "interest": 73046630,
+      "costs": 13700,
+      "total": 283060330,
+      "secured_estimate": 283060330,
+      "rows": [
+        {
+          "date": "2025-05-01",
+          "payment": 500,
+          "principal": 210000000,
+          "interest": 13739178,
+          "costs": 14500
+        },
+        {
+          "date": "2026-02-01",
+          "payment": 800,
+          "principal": 210000000,
+          "interest": 45339288,
+          "costs": 13700
+        }
+      ],
+      "assumptions": "단일 연이율·365일 단리·비용→이자→원금 충당. 약정/법률상 이율·충당·담보범위 확인 후 사용."
+    }
+  },
+  {
+    "input": {
+      "principal": "1000.5",
+      "rate": "1.01",
+      "start": "2025-01-01",
+      "as_of": "2026-10-01",
+      "cap": "999999999",
+      "costs": "15000",
+      "payments": [
+        {
+          "date": "2025-05-01",
+          "amount": "500"
+        },
+        {
+          "date": "2026-02-01",
+          "amount": "800"
+        }
+      ]
+    },
+    "expected": {
+      "principal": 1001,
+      "interest": 18,
+      "costs": 13700,
+      "total": 14718,
+      "secured_estimate": 14718,
+      "rows": [
+        {
+          "date": "2025-05-01",
+          "payment": 500,
+          "principal": 1001,
+          "interest": 3,
+          "costs": 14500
+        },
+        {
+          "date": "2026-02-01",
+          "payment": 800,
+          "principal": 1001,
+          "interest": 11,
+          "costs": 13700
+        }
+      ],
+      "assumptions": "단일 연이율·365일 단리·비용→이자→원금 충당. 약정/법률상 이율·충당·담보범위 확인 후 사용."
+    }
+  }
+]
