@@ -28,9 +28,20 @@ def init():
 def password(value,salt): return hashlib.pbkdf2_hmac('sha256',value.encode(),bytes.fromhex(salt),600000).hex()
 def audit(c,uid,action,rid): c.execute('INSERT INTO audit(user_id,at,action,record_id) VALUES(?,datetime(\'now\'),?,?)',(uid,action,rid))
 def validate(kind,p):
-    if kind not in ('claim','asset','case','task','event'): raise ValueError('잘못된 자료 유형')
+    if kind not in ('claim','asset','case','task','event','tax'): raise ValueError('잘못된 자료 유형')
     if not isinstance(p,dict) or not p.get('title'): raise ValueError('제목이 필요합니다.')
     if len(json.dumps(p))>100000: raise ValueError('자료 크기 초과')
+    if kind=='tax':
+        from decimal import Decimal
+        date.fromisoformat(p['due'])
+        for k in ('notice_date','legal_date','paid_date'):
+            if p.get(k): date.fromisoformat(p[k])
+        amounts=[Decimal(str(p.get(k,0))) for k in ('amount','paid')]
+        if any(not x.is_finite() or x<0 or x!=x.to_integral_value() or x>9007199254740991 for x in amounts): raise ValueError('세액은 0 이상의 정수로 입력하세요.')
+        if amounts[1]>amounts[0]: raise ValueError('납부액은 등록 세액을 초과할 수 없습니다.')
+        if p.get('role') not in ('본인 납부','채무자 조세채권') or p.get('status') not in ('예상','고지확인','부분납부','납부완료','이의신청','취소확인'): raise ValueError('세금 구분과 상태를 확인하세요.')
+        if p['status']=='납부완료' and (p['role']!='본인 납부' or not p.get('paid_date') or not p.get('completion_evidence') or amounts[0]!=amounts[1]): raise ValueError('납부액·납부일·증빙을 확인하세요.')
+        if p['status']=='취소확인' and not p.get('completion_evidence'): raise ValueError('취소 결정 증빙이 필요합니다.')
     if kind=='claim': ledger(p)
     if kind=='case':
         if p.get('stage') not in STAGES: raise ValueError('잘못된 사건 단계')
@@ -210,6 +221,11 @@ class Handler(BaseHTTPRequestHandler):
                 if old and (p.get('version')!=old['version'] or old['kind']!=kind): return self.send(409,{'error':'자료가 변경되었습니다. 새로고침 후 다시 저장하세요.'})
                 c.execute('INSERT INTO records VALUES(?,?,?,?,1) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,version=records.version+1',(rid,uid,kind,json.dumps(data,ensure_ascii=False)))
                 audit(c,uid,'수정' if old else '등록',rid)
+                if kind=='tax':
+                    tid=hashlib.sha256((rid+'tax-due').encode()).hexdigest()[:24]; done=data['status'] in ('납부완료','취소확인')
+                    task={'title':('조세 배당순위 검토 · ' if data['role']=='채무자 조세채권' else '세금 신고·납부 확인 · ')+data['title'],'due':data['due'],'case_id':data.get('case_id',''),'tax_id':rid,'done':done,'evidence':data.get('completion_evidence','') if done else '', 'automated':True,'notes':'등록 고지기한 또는 검토일. 원문·납부확인·배당순위를 검토하세요. 이의신청만으로 징수 유예를 확정하지 않습니다.'}
+                    c.execute('INSERT INTO records VALUES(?,?,?,?,1) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,version=records.version+1',(tid,uid,'task',json.dumps(task,ensure_ascii=False)))
+                    audit(c,uid,'세금 기한 업무 갱신',tid)
                 if kind=='case':
                     schedules=[('auction_date','직접 입찰·공유자 우선매수 검토',7),('distribution_date','배당표·채권액·수령 요건 검토',3),('claim_deadline','채권신고·배당요구 필요 여부 및 제출 확인',3),('special_deadline','채권자 매수 특별지급 신고 검토',1)]
                     for key,label,lead in schedules:

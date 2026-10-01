@@ -94,6 +94,8 @@ const assert=require('node:assert/strict');
   }
   for(const kind of ['claim','case']){await page.locator('.command-strip [data-new='+kind+']').click();await page.locator('#editor').waitFor({state:'visible'});await page.locator('#close-editor').click();}
   await page.locator('#toast').waitFor({state:'hidden'});fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/desktop.png',fullPage:true});
+  await page.locator('nav [data-page=tax]').click();await page.locator('[data-new=tax]').click();
+  await page.locator('#record-form [name=title]').fill('테스트 세금 고지');await page.locator('#record-form [name=status]').selectOption('고지확인');await page.locator('#record-form [name=amount]').fill('10000');await page.locator('#record-form [name=paid]').fill('0');await page.locator('#record-form button[type=submit]').click();await page.locator('#editor').waitFor({state:'hidden'});await page.getByText('테스트 세금 고지',{exact:true}).waitFor();await page.locator('nav [data-page=task]').click();await page.getByText('세금 신고·납부 확인 · 테스트 세금 고지',{exact:true}).waitFor();await page.locator('nav [data-page=dashboard]').click();
   for(const size of [{width:320,height:740},{width:390,height:844},{width:700,height:900},{width:844,height:390}]){
    await page.setViewportSize(size);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'dashboard overflow '+size.width);
   }
