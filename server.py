@@ -4,6 +4,8 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from http.cookies import SimpleCookie
 from datetime import date, timedelta
 from core import ledger, scenario, preemption, VARIABLES
+from drafts import draft
+from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).parent
 DB = os.environ.get('SONG_GUARD_DB', str(ROOT/'data'/'songguard.sqlite3'))
@@ -108,6 +110,18 @@ class Handler(BaseHTTPRequestHandler):
         if path=='/api/logout' and method=='POST':
             with connect() as c: c.execute('DELETE FROM sessions WHERE token=?',(s['token'],))
             return self.send(200,{},headers={'Set-Cookie':'sg_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'})
+        if path.startswith('/api/draft/') and method=='GET':
+            rid=path.rsplit('/',1)[-1]
+            kind=parse_qs(urlsplit(self.path).query).get('kind',['statement'])[0]
+            with connect() as c:
+                row=c.execute('SELECT payload FROM records WHERE id=? AND user_id=? AND kind=\'case\'',(rid,uid)).fetchone()
+                if not row: return self.send(404,{'error':'사건 없음'})
+                case=json.loads(row['payload']); linked={}
+                for key in ('claim','asset'):
+                    record=c.execute('SELECT payload FROM records WHERE id=? AND user_id=?',(case.get(key+'_id',''),uid)).fetchone()
+                    linked[key]=json.loads(record['payload']) if record else {}
+            text=draft(kind,case,linked['claim'],linked['asset'])
+            return self.send(200,text.encode(),'text/plain; charset=utf-8',{'Content-Disposition':'attachment; filename="Song_Guard_draft.txt"'})
         if path in ('/api/calculate','/api/scenario','/api/preemption') and method=='POST':
             p=json.loads(self.body()); return self.send(200,{'result':{'/api/calculate':ledger,'/api/scenario':scenario,'/api/preemption':preemption}[path](p)})
         if path=='/api/record' and method=='POST':

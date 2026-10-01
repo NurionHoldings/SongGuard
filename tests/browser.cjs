@@ -8,10 +8,10 @@ const assert=require('node:assert/strict');
 (async()=>{
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'songguard-ui-'));
  const server=spawn('python',['server.py'],{env:{...process.env,PORT:'8092',SONG_GUARD_DB:path.join(temp,'test.db'),SONG_GUARD_ALLOW_REGISTRATION:'true',SONG_GUARD_SECURE_COOKIE:'false'},stdio:'inherit'});
- let browser;
+ let browser,page;
  try {
   for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:8092/health')).ok)break}catch{}await new Promise(r=>setTimeout(r,100));}
-  browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000}});
+  browser=await chromium.launch({headless:true});page=await browser.newPage({viewport:{width:1440,height:1000}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:8092');
   await page.locator('[name=username]').fill('browser-owner');await page.locator('[name=password]').fill('browser-test-password-123');
@@ -30,7 +30,8 @@ const assert=require('node:assert/strict');
   await page.locator('[data-page=analysis]').click();await page.locator('#analysis-case').selectOption({label:'테스트 경매'});
   await page.waitForFunction(()=>Number(document.querySelector('#scenario-form [name=claim]').value)>0);
   await page.locator('#scenario-form [name=resale]').fill('130000000');await page.locator('#scenario-form button').click();
-  await page.locator('#scenario-result').getByText('배당 추정',{exact:true}).waitFor();
+  await page.locator('#scenario-result strong').first().waitFor();
+  assert.match(await page.locator('#scenario-result').textContent(),/배당 추정/);
   await page.locator('#preemption-form [name=coowner_verified]').check();await page.locator('#preemption-form [name=other_share_verified]').check();
   await page.locator('#preemption-form button').click();await page.locator('#preemption-result').getByText(/우선매수 검토 대상/).waitFor();
   await page.locator('[data-page=case]').click();await page.locator('[data-view]').first().click();
@@ -41,5 +42,6 @@ const assert=require('node:assert/strict');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'mobile horizontal overflow');
   assert.deepEqual(errors,[],'browser runtime errors');
   console.log('Browser workflow passed: account, claim, case, generated task, analysis, preemption, evidence, responsive layout.');
- } finally {if(browser)await browser.close();server.kill();fs.rmSync(temp,{recursive:true,force:true});}
+ } catch(e) {if(page){fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/failure.png',fullPage:true});console.error(await page.locator('#toast').textContent());}throw e;}
+ finally {if(browser)await browser.close();server.kill();fs.rmSync(temp,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1});
