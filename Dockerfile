@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 WORKDIR /app
-COPY core.py server.py drafts.py manage.py ./
+COPY core.py server.py drafts.py paperwork.py manage.py ./
 COPY static ./static
 RUN useradd --uid 10001 --create-home songguard && mkdir -p /data && chown songguard:songguard /data
 USER songguard

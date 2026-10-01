@@ -44,6 +44,34 @@ const assert=require('node:assert/strict');
   await page.locator('[data-page=case]').click();await page.locator('[data-view]').first().click();
   await page.locator('#upload').setInputFiles({name:'proof.txt',mimeType:'text/plain',buffer:Buffer.from('가상 증빙')});await page.locator('#upload-btn').click();
   await page.locator('#detail-content a').filter({hasText:'proof.txt'}).waitFor();await page.locator('#close-detail').click();
+  await page.locator('[data-page=filing]').click();await page.locator('#new-filing').click();
+  await page.locator('#filing-form [name=form_kind]').selectOption('statement');
+  await page.locator('#filing-form [name=creditor]').fill('가상 채권자');await page.locator('#filing-form [name=creditor_address]').fill('가상 주소 1');
+  await page.locator('#filing-form [name=phone]').fill('연락처 검증용');await page.locator('#filing-form [name=debtor_address]').fill('가상 주소 2');
+  await page.locator('#filing-form [name=amount]').fill('99990000');await page.locator('#filing-form [name=breakdown]').fill('원금 99,990,000원. 이자 없음. 검증용 가상 자료.');
+  await page.locator('#filing-form [name=basis]').fill('가상 대여 계약');await page.locator('#filing-form [name=attachments]').fill('가상 대여 계약서\n가상 등기사항증명서');
+  await page.locator('[data-check]').evaluateAll(els=>els.forEach(el=>el.checked=true));await page.locator('#approve-filing').click();
+  await page.getByText('출력준비',{exact:true}).last().waitFor();
+  const printHref=await page.locator('#paperwork a[href^="/api/print/"]').getAttribute('href');
+  const printPage=await page.context().newPage();await printPage.goto('http://127.0.0.1:8092'+printHref);
+  await printPage.locator('#print:not([disabled])').waitFor();fs.mkdirSync('test-results',{recursive:true});
+  await printPage.pdf({path:'test-results/statement-ui.pdf',format:'A4',preferCSSPageSize:true});await printPage.screenshot({path:'test-results/print-preview.png',fullPage:true});await printPage.close();
+  await page.locator('#printed-confirm').check();await page.locator('#printed-filing').click();await page.locator('#receipt-form').waitFor();
+  await page.locator('#receipt-file').setInputFiles({name:'receipt.txt',mimeType:'text/plain',buffer:Buffer.from('가상 법원 접수증')});await page.locator('#receipt-upload').click();await page.waitForFunction(()=>document.querySelector('#receipt-form [name=evidence]')?.value);
+  await page.locator('#receipt-form [name=number]').fill('가상 접수 123');await page.locator('#receipt-form [name=by]').fill('가상 접수자');await page.locator('#receipt-form [name=signed]').check();await page.locator('#receipt-form button').click();
+  await page.getByText('접수완료',{exact:true}).last().waitFor();await page.locator('#close-paperwork').click();
+  // Render each form with explicit fictitious facts for PDF layout inspection.
+  for(const kind of ['petition','statement','demand','preemption','special','correction','payment']){
+   const printHtml=await page.evaluate(async kind=>{
+    const st=await (await fetch('/api/state')).json();const caseRecord=st.records.find(r=>r.kind==='case');
+    const data=Object.fromEntries(st.forms[kind].fields.map(f=>[f.key,'가상 검증 자료']));
+    Object.assign(data,{signed_date:'2026-10-01',number:'2026타경00000',amount:'1000000',price:'2000000',dividend:'1000000',creditor:'가상 채권자',court:'가상 지방법원',attachments:'가상 계약서 1부\n가상 등기사항증명서 1부',property:'가상 토지: 가상시 가상구 가상동 1-1\n지목: 대, 면적: 100㎡\n실행 대상: 가상 채무자의 10분의 9 지분'});
+    const rr=await fetch('/api/filing',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':st.csrf},body:JSON.stringify({action:'save',case_id:caseRecord.id,form_kind:kind,data})});const saved=await rr.json();
+    if(!rr.ok)throw Error(saved.error);return '/api/print/'+saved.id;
+   },kind);
+   const preview=await page.context().newPage();await preview.goto('http://127.0.0.1:8092'+printHtml);
+   await preview.pdf({path:'test-results/'+kind+'.pdf',format:'A4',preferCSSPageSize:true});await preview.close();
+  }
   await page.locator('[data-page=dashboard]').click();await page.locator('#toast').waitFor({state:'hidden'});fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/mobile.png',fullPage:true});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'mobile horizontal overflow');

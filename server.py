@@ -5,6 +5,7 @@ from http.cookies import SimpleCookie
 from datetime import date, timedelta
 from core import ledger, scenario, preemption, VARIABLES
 from drafts import draft
+from paperwork import schemas, missing, html as filing_html, CHECKS
 from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).parent
@@ -67,7 +68,7 @@ class Handler(BaseHTTPRequestHandler):
         if path=='/health': return self.send(200,{'status':'ok'})
         if not path.startswith('/api/'):
             if method!='GET': return self.send(405,{'error':'허용되지 않는 요청'})
-            files={'/':'index.html','/app.js':'app.js','/style.css':'style.css'}
+            files={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/paperwork.js':'paperwork.js','/print.css':'print.css','/print.js':'print.js'}
             if path not in files: return self.send(404,{'error':'없음'})
             types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}
             file=ROOT/'static'/files[path]; return self.send(200,file.read_bytes(),types[file.suffix])
@@ -106,7 +107,71 @@ class Handler(BaseHTTPRequestHandler):
                 records=[{**dict(r),'payload':json.loads(r['payload'])} for r in c.execute('SELECT id,kind,payload,version FROM records WHERE user_id=?',(uid,))]
                 logs=[dict(r) for r in c.execute('SELECT at,action,record_id FROM audit WHERE user_id=? ORDER BY id DESC LIMIT 100',(uid,))]
                 evidence=[dict(r) for r in c.execute('SELECT id,record_id,name FROM evidence WHERE user_id=?',(uid,))]
-            return self.send(200,{'csrf':s['csrf'],'records':records,'audit':logs,'evidence':evidence,'variables':VARIABLES,'stages':STAGES,'connectors':{'court':'미연동 · 문서 등록 방식','registry':'미연동 · 등기 원문 등록','bank':'미연동 · 입금 증빙 등록'}})
+            return self.send(200,{'csrf':s['csrf'],'records':records,'audit':logs,'evidence':evidence,'variables':VARIABLES,'stages':STAGES,'forms':schemas(),'connectors':{'court':'사람이 출력서류 접수 · 접수증 등록','registry':'미연동 · 등기 원문 등록','bank':'미연동 · 입금 증빙 등록'}})
+        if path.startswith('/api/print/') and method=='GET':
+            rid=path.rsplit('/',1)[-1]
+            with connect() as c: row=c.execute('SELECT payload FROM records WHERE id=? AND user_id=? AND kind=\'filing\'',(rid,uid)).fetchone()
+            if not row: return self.send(404,{'error':'접수서류 없음'})
+            return self.send(200,filing_html({**json.loads(row['payload']),'id':rid}).encode(),'text/html; charset=utf-8')
+        if path=='/api/filing' and method=='POST':
+            p=json.loads(self.body()); action=p['action']; rid=p.get('id') or secrets.token_hex(12)
+            with connect() as c:
+                old=c.execute('SELECT * FROM records WHERE id=? AND user_id=? AND kind=\'filing\'',(rid,uid)).fetchone()
+                if p.get('id') and not old: return self.send(404,{'error':'접수서류 없음'})
+                if old and p.get('version')!=old['version']: return self.send(409,{'error':'서류가 변경되었습니다. 새로고침하세요.'})
+                doc=json.loads(old['payload']) if old else {}
+                if action=='save':
+                    if doc and doc['status']!='작성중': raise ValueError('확정된 문서는 수정할 수 없습니다. 새 문서를 생성하세요.')
+                    kind=p['form_kind']; data=p['data']; cid=p['case_id']
+                    if kind not in schemas() or not isinstance(data,dict): raise ValueError('잘못된 서식')
+                    if len(json.dumps(data))>100000: raise ValueError('서류 크기 초과')
+                    allowed={x['key'] for x in schemas()[kind]['fields']}
+                    data={k:str(v) for k,v in data.items() if k in allowed}
+                    case_row=c.execute('SELECT * FROM records WHERE id=? AND user_id=? AND kind=\'case\'',(cid,uid)).fetchone()
+                    if not case_row: raise ValueError('연결 경매사건을 선택하세요.')
+                    case=json.loads(case_row['payload']); snapshot={'case':dict(case_row)}
+                    for key in ('claim','asset'):
+                        source=c.execute('SELECT id,payload,version FROM records WHERE id=? AND user_id=?',(case.get(key+'_id',''),uid)).fetchone()
+                        if source: snapshot[key]=dict(source)
+                    doc={'title':schemas()[kind]['title'],'form_kind':kind,'case_id':cid,'data':data,'status':'작성중','checks':{},'snapshot':snapshot}
+                elif action=='approve':
+                    if doc.get('status')!='작성중': raise ValueError('작성중 문서만 확정할 수 있습니다.')
+                    errors=missing(doc['form_kind'],doc['data'])
+                    if errors: raise ValueError('필수 입력 확인: '+', '.join(errors))
+                    checks=p.get('checks',{})
+                    if any(checks.get(k) is not True for k in CHECKS): raise ValueError('제출 전 확인사항을 모두 확인하세요.')
+                    if doc['form_kind']=='petition':
+                        source=doc['snapshot'].get('asset'); asset=json.loads(source['payload']) if source else {}
+                        if asset.get('ownership')!='근저당': raise ValueError('이 임의경매 서식은 근저당 실행용입니다. 지분이전·가등기담보는 별도 검토하세요.')
+                    if doc['form_kind']=='preemption':
+                        case=json.loads(doc['snapshot']['case']['payload'])
+                        if case.get('type')!='share': raise ValueError('전체·공유물분할·일괄매각에는 이 우선매수 서식을 바로 확정할 수 없습니다.')
+                    doc.update(status='출력준비',checks=checks,approved_at=time.time())
+                elif action=='printed':
+                    if doc.get('status')!='출력준비': raise ValueError('확정된 출력준비 문서만 출력확인할 수 있습니다.')
+                    if p.get('confirmed') is not True: raise ValueError('실제 출력본 확인이 필요합니다.')
+                    doc.update(status='출력확인',printed_at=time.time())
+                elif action=='submit':
+                    if doc.get('status')!='출력확인': raise ValueError('출력·서명·첨부 준비를 확인한 뒤 접수를 등록하세요.')
+                    receipt=p.get('receipt',{}); date.fromisoformat(receipt['date'])
+                    if receipt.get('signed') is not True: raise ValueError('서명·첨부자료를 갖춘 실제 접수를 확인하세요.')
+                    if not receipt.get('number') or not receipt.get('by'): raise ValueError('접수번호/사건번호와 접수자를 입력하세요.')
+                    proof=c.execute('SELECT 1 FROM evidence WHERE id=? AND user_id=? AND record_id=?',(receipt.get('evidence',''),uid,doc['case_id'])).fetchone()
+                    if not proof: raise ValueError('해당 사건에 접수증 증빙을 먼저 업로드하세요.')
+                    doc.update(status='접수완료',receipt={k:receipt.get(k,'') for k in ('date','number','by','evidence','notes','case_number')})
+                    if doc['form_kind']=='petition':
+                        row=c.execute('SELECT payload FROM records WHERE id=? AND user_id=?',(doc['case_id'],uid)).fetchone(); case=json.loads(row['payload'])
+                        if case['stage'] in ('관리','집행준비'): case['stage']='경매접수'
+                        if receipt.get('case_number'): case['number']=receipt['case_number']
+                        c.execute('UPDATE records SET payload=?,version=version+1 WHERE id=? AND user_id=?',(json.dumps(case,ensure_ascii=False),doc['case_id'],uid))
+                        audit(c,uid,'사람 접수 확인 후 사건 갱신',doc['case_id'])
+                    task={'title':doc['title']+' 접수 후 진행·보정 안내 확인','due':(date.fromisoformat(receipt['date'])+timedelta(days=7)).isoformat(),'case_id':doc['case_id'],'done':False,'notes':'접수 7일 후 내부 확인일입니다. 법정기한이 아니며 법원 통지의 실제 기한을 별도 등록하세요.'}
+                    tid=secrets.token_hex(12);c.execute('INSERT INTO records VALUES(?,?,?,?,1)',(tid,uid,'task',json.dumps(task,ensure_ascii=False)))
+                    audit(c,uid,'접수 후 확인업무 생성',tid)
+                else: raise ValueError('지원되지 않는 접수 작업')
+                c.execute('INSERT INTO records VALUES(?,?,?,?,1) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,version=records.version+1',(rid,uid,'filing',json.dumps(doc,ensure_ascii=False)))
+                audit(c,uid,'접수서류 '+action,rid)
+            return self.send(200,{'id':rid})
         if path=='/api/logout' and method=='POST':
             with connect() as c: c.execute('DELETE FROM sessions WHERE token=?',(s['token'],))
             return self.send(200,{},headers={'Set-Cookie':'sg_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'})
