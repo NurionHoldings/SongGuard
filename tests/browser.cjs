@@ -82,6 +82,10 @@ const assert=require('node:assert/strict');
   }
   await page.locator('nav [data-page=dashboard]').click();
   assert.equal(await page.locator('.brand-logo').evaluate(img=>img.complete&&img.naturalWidth>0),true,'brand logo loads');
+  const animationFrames=await page.locator('.brand-logo').evaluate(img=>{const animations=img.getAnimations();const sample=t=>{animations.forEach(a=>{a.pause();a.currentTime=t});const s=getComputedStyle(img);return {transform:s.transform,filter:s.filter}};const start=sample(0),later=sample(3000);animations.forEach(a=>a.play());return {count:animations.length,start,later}});
+  assert.equal(animationFrames.count,2,'logo motion and colour animations');assert.notEqual(animationFrames.start.transform,animationFrames.later.transform,'logo moves');assert.notEqual(animationFrames.start.filter,animationFrames.later.filter,'logo colour changes');
+  await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.brand-logo').evaluate(img=>getComputedStyle(img).animationName),'none','reduced motion disables animation');await page.emulateMedia({reducedMotion:'no-preference'});
+
   for(const selector of ['.annunciator[data-filter=overdue]','.annunciator[data-filter=today]','.annunciator[data-filter=pending]','.annunciator[data-page=event]','.instrument[data-page=task]','.instrument[data-page=claim]','.instrument[data-page=case]','.command-strip [data-page=filing]','.command-strip [data-page=analysis]','.command-strip [data-page=audit]','.connector [data-page=filing]','.connector [data-page=asset]','.connector [data-page=audit]']){
    await page.locator('#content '+selector).first().click();assert.equal(await page.locator('#content').textContent().then(x=>x.length>0),true,'linked page renders: '+selector);await page.locator('nav [data-page=dashboard]').click();
   }
