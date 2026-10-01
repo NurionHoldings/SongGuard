@@ -27,6 +27,8 @@ class API(unittest.TestCase):
         status,body,_=self.request(a,'/api/record',p,csrf);self.assertEqual(status,200);rid=json.loads(body)['id']
         _,body,_=self.request(a,'/api/state');state=json.loads(body);self.assertEqual(len(state['records']),2)
         task=next(r for r in state['records'] if r['kind']=='task');self.assertEqual(task['payload']['due'],'2026-11-13')
+        status,draft_body,_=self.request(a,'/api/draft/'+rid+'?kind=preemption');self.assertEqual(status,200);self.assertIn('공유자 우선매수신고서',draft_body.decode())
+        self.assertEqual(self.request(b,'/api/draft/'+rid+'?kind=preemption')[0],404)
         _,body,_=self.request(b,'/api/state');self.assertEqual(json.loads(body)['records'],[])
         self.assertEqual(self.request(b,'/api/record',{**p,'id':rid,'version':1},other)[0],404)
         self.assertEqual(self.request(a,'/api/record',p,'invalid')[0],403)

@@ -37,7 +37,7 @@ const assert=require('node:assert/strict');
   await page.locator('[data-page=case]').click();await page.locator('[data-view]').first().click();
   await page.locator('#upload').setInputFiles({name:'proof.txt',mimeType:'text/plain',buffer:Buffer.from('가상 증빙')});await page.locator('#upload-btn').click();
   await page.locator('#detail-content a').filter({hasText:'proof.txt'}).waitFor();await page.locator('#close-detail').click();
-  await page.locator('[data-page=dashboard]').click();fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/desktop.png',fullPage:true});
+  await page.locator('[data-page=dashboard]').click();await page.locator('#toast').waitFor({state:'hidden'});fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/mobile.png',fullPage:true});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'mobile horizontal overflow');
   assert.deepEqual(errors,[],'browser runtime errors');
