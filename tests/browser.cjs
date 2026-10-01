@@ -11,7 +11,7 @@ const assert=require('node:assert/strict');
  let browser,page;
  try {
   for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:8092/health')).ok)break}catch{}await new Promise(r=>setTimeout(r,100));}
-  browser=await chromium.launch({headless:true});page=await browser.newPage({viewport:{width:1440,height:1000}});
+  browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:1440,height:1000}});page=await context.newPage();
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:8092');
   await page.locator('[name=username]').fill('browser-owner');await page.locator('[name=password]').fill('browser-test-password-123');
