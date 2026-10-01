@@ -28,7 +28,7 @@ def init():
 def password(value,salt): return hashlib.pbkdf2_hmac('sha256',value.encode(),bytes.fromhex(salt),600000).hex()
 def audit(c,uid,action,rid): c.execute('INSERT INTO audit(user_id,at,action,record_id) VALUES(?,datetime(\'now\'),?,?)',(uid,action,rid))
 def validate(kind,p):
-    if kind not in ('claim','asset','case','task','event','tax'): raise ValueError('잘못된 자료 유형')
+    if kind not in ('claim','asset','case','task','event','tax','inspection'): raise ValueError('잘못된 자료 유형')
     if not isinstance(p,dict) or not p.get('title'): raise ValueError('제목이 필요합니다.')
     if len(json.dumps(p))>100000: raise ValueError('자료 크기 초과')
     if kind=='tax':
@@ -86,7 +86,7 @@ class Handler(BaseHTTPRequestHandler):
         if path=='/health': return self.send(200,{'status':'ok'})
         if not path.startswith('/api/'):
             if method!='GET': return self.send(405,{'error':'허용되지 않는 요청'})
-            files={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/paperwork.js':'paperwork.js','/print.css':'print.css','/print.js':'print.js','/logo.png':'logo.png'}
+            files={'/':'index.html','/app.js':'app.js','/inspector.js':'inspector.js','/style.css':'style.css','/paperwork.js':'paperwork.js','/print.css':'print.css','/print.js':'print.js','/logo.png':'logo.png'}
             if path not in files: return self.send(404,{'error':'없음'})
             types={'.png':'image/png','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}
             file=ROOT/'static'/files[path]; return self.send(200,file.read_bytes(),types[file.suffix])

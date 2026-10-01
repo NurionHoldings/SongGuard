@@ -95,6 +95,7 @@ const assert=require('node:assert/strict');
    await page.locator('#content '+selector).first().click();assert.equal(await page.locator('#content').textContent().then(x=>x.length>0),true,'linked page renders: '+selector);await page.locator('nav [data-page=dashboard]').click();
   }
   for(const kind of ['asset','claim','case']){await page.locator('.command-strip [data-new='+kind+']').click();await page.locator('#editor').waitFor({state:'visible'});await page.locator('#close-editor').click();}
+  await page.locator('nav [data-page=arkaon]').click();await page.locator('#run-inspection').click();await page.getByText('현재 API 상태 응답 정상 · 로그인한 계정 자료 조회 성공',{exact:true}).waitFor();await page.getByText('채권 계산 실행: 성공 1건 / 오류 0건 / 미실행 0건',{exact:true}).waitFor();await page.locator('#save-inspection').click();await page.locator('section').filter({hasText:'저장된 점검 보고서'}).getByRole('button',{name:'열기'}).first().waitFor();await page.locator('[data-inspection-task]').first().click();assert.equal(await page.locator('#record-form [name=title]').inputValue().then(s=>s.startsWith('아르카온 검토')),true);await page.locator('#close-editor').click();await page.locator('nav [data-page=dashboard]').click();
   await page.locator('#toast').waitFor({state:'hidden'});fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/desktop.png',fullPage:true});
   await page.locator('nav [data-page=tax]').click();await page.locator('[data-new=tax]').click();
   await page.locator('#record-form [name=title]').fill('테스트 세금 고지');await page.locator('#record-form [name=status]').selectOption('고지확인');await page.locator('#record-form [name=amount]').fill('10000');await page.locator('#record-form [name=paid]').fill('0');await page.locator('#record-form button[type=submit]').click();await page.locator('#editor').waitFor({state:'hidden'});await page.getByText('테스트 세금 고지',{exact:true}).waitFor();await page.locator('nav [data-page=task]').click();assert.equal(await page.getByText('확인된 세금 납부기한 · 테스트 세금 고지',{exact:true}).count(),0,'unverified tax must not create notification');await page.locator('nav [data-page=dashboard]').click();
@@ -105,7 +106,7 @@ const assert=require('node:assert/strict');
   assert.equal(await page.locator('#logout').isVisible(),true,'mobile logout remains reachable');
   assert.equal(await page.locator('#logout').evaluate(b=>b.getBoundingClientRect().height>=44),true,'mobile touch target');
   await page.screenshot({path:'test-results/mobile.png',fullPage:true});
-  await page.locator('nav [data-page=claim]').click();
+  await page.locator('nav [data-page=arkaon]').click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'mobile Arkaon overflow');await page.locator('nav [data-page=claim]').click();
   assert.equal(await page.locator('.records-table td').first().getAttribute('data-label'),'자료명','record card labels');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'record cards overflow');
   await page.screenshot({path:'test-results/mobile-records.png',fullPage:true});
